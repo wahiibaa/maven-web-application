@@ -1,0 +1,36 @@
+node {
+  def mavenHome = tool name: 'Maven3.8.6'
+  stage('1cloneCode'){
+    git "https://github.com/wahiibaa/maven-web-application"
+  }
+   stage('2Test&Build'){
+    sh "${mavenHome}/bin/mvn clean package" 
+  }
+  stage('3codeQuality'){
+    sh "${mavenHome}/bin/mvn clean sonar:sonar"
+  }
+  stage('4uploadArtifacts'){
+    sh "${mavenHome}/bin/mvn deploy"
+  }
+  stage('5deploy2UAT'){
+    sh "echo 'deploy to UAT' "
+    deploy adapters: [tomcat9(credentialsId: 'd39ea681-eb63-4f90-8f68-4aa8e47e14a7', path: '', url: 'http://107.21.84.107:8080/')], contextPath: null, war: 'target/*war'
+  }
+  stage('6approvalGate'){
+    sh "echo 'ready for review' "
+    timeout(time:5, unit: 'HOURS'){
+      input message: 'Application ready for deployment, Please review and approve'
+    }  
+  }
+  stage('7deploy2Prod'){
+   deploy adapters: [tomcat9(credentialsId: 'd39ea681-eb63-4f90-8f68-4aa8e47e14a7', path: '', url: 'http://107.21.84.107:8080/')], contextPath: null, war: 'target/*war'
+
+  }
+  stage('8emailNotification'){
+    emailext body: '''Hi All,
+
+Check build status.
+
+Wahiba tech.''', recipientProviders: [buildUser(), developers(), upstreamDevelopers()], subject: 'Build status', to: 'tesla team'
+  }
+}
